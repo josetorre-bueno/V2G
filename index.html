@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<!-- V2G Analysis Engine — wrapper -->
+<!-- Version: v1.0.0 -->
+<!-- Module file: rva_app_v1_0_0.jsx -->
+<!-- Part of: CCE / Makello Tools -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>V2G Analysis Engine v1.0.0 — CCE / Makello</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.24.7/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: #0a0f1a; color: #e8f4ff; font-family: sans-serif; }
+    #root { min-height: 100vh; }
+    #loading {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; font-family: monospace; font-size: 13px;
+      color: #6b8db5; letter-spacing: 0.1em;
+    }
+  </style>
+</head>
+<body>
+  <div id="loading">LOADING…</div>
+  <div id="root"></div>
+  <script>
+    function checkMount() {
+      var loading = document.getElementById('loading');
+      var root = document.getElementById('root');
+      if (root && root.children.length > 0) {
+        if (loading) loading.style.display = 'none';
+      } else {
+        setTimeout(function () {
+          var root2 = document.getElementById('root');
+          if (!root2 || root2.children.length === 0) {
+            if (loading) loading.textContent = 'ERROR — check browser console (F12)';
+          } else {
+            if (loading) loading.style.display = 'none';
+          }
+        }, 5000);
+      }
+    }
+    window.addEventListener('load', function () { setTimeout(checkMount, 1000); });
+  </script>
+  <script type="text/babel" src="rva_app_v1_0_0.jsx?v=1.0.0"></script>
+</body>
+</html>

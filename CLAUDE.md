@@ -73,6 +73,27 @@ The old multi-column spreadsheet-derived format is retired. Semi-permanent param
 
 ---
 
+## Versioning
+
+Every change to the UI — no matter how small — must increment **at least the minor version number** (`v1.X.0`) in **all** of the following locations simultaneously:
+
+| Location | Example |
+|---|---|
+| JSX filename | `rva_app_v1_4_0.jsx` |
+| `const VERSION` inside the JSX | `const VERSION = "1.4.0";` |
+| Top comment in the JSX | `// Version: 1.4.0` |
+| `index.html` `<title>` | `V2G Analysis Engine v1.4.0 — CCE` |
+| `index.html` version comment | `<!-- Version: v1.4.0 -->` |
+| `index.html` module file comment | `<!-- Module file: rva_app_v1_4_0.jsx -->` |
+| `index.html` `<script src>` | `rva_app_v1_4_0.jsx?v=1.4.0` |
+| CLAUDE.md change log | new row with date and description |
+
+**Never edit an existing versioned JSX file after it has been deployed.** Create a new file with the incremented version number instead. This ensures that the filename, the displayed version, and the loaded script are always in sync, and that the browser cache-busting query string (`?v=X.X.X`) forces a reload.
+
+Use **patch version** (`v1.3.X`) only for hotfixes to a version that has not yet been deployed. Once a version is live on GitHub Pages, always increment the minor version.
+
+---
+
 ## Code Style
 
 - All logic for a single circuit run is contained within the `rva(circuit_num, mode)` function
@@ -100,4 +121,5 @@ The old multi-column spreadsheet-derived format is retired. Semi-permanent param
 | 2026-04-08 | Investigated Standard mode discrepancy vs V2GModel.xlsx (code: 7.147%, Excel: 6.933%). Root cause: Excel Solver uses grid-side kWh per car as the energy constraint, omitting discharge efficiency. Code correctly uses battery-side kWh (grid_need / (avail × EFF)), because efficiency losses mean each car must give up more energy from its battery than reaches the grid — genuinely requiring more cars. The Excel formulation silently allows each car to exceed the 30% battery draw limit by a factor of 1/EFF. Code result (7.147%) retained as physically correct. V2GModel.xlsx noted as having a minor conservative undercount in the Standard mode energy constraint. |
 | 2026-04-08 | Added Uncoordinated mode (`rva_app_v1_1_0.jsx`). Each V2G car independently zeroes its own house meter during a settable discharge window (default 4 pm–midnight), limited by EVSE capacity and the 30% battery draw rule. Cars starting the window at home and cars arriving during it all assumed at 90% SOC. Requires a Green Button CSV (SDG&E format) uploaded by the user; app parses average weekday hourly load for the selected circuit month. Results appear as a third column alongside Standard and Optimized. Outputs: `Circuit_<N>_OU.csv` and `Circuit_<N>_HistoryU.csv`. New RESTORE KEYS: `dischargeWindowStart`, `dischargeWindowEnd`, `circuitMonth`, `houseLoad`. |
 | 2026-04-08 | Added in-app User Manual with modal viewer and plain-text download (`rva_app_v1_2_0.jsx`). Rebranded from CCE/Makello to CCE (Center for Community Energy) throughout — tool is not part of the Makello suite. |
-| 2026-04-09 | Added in-app canvas chart (`rva_app_v1_3_0.jsx`). ScatterChart matches Excel Graph template format: X = hours 1–24, series = Base Load (grey), Projected (red), Managed Standard (blue), Managed Optimized (green), Managed Uncoordinated (orange, when available), Threshold (dashed). Dark CCE theme. Includes ↓ Save Chart PNG download. |
+| 2026-04-09 | Added in-app canvas chart (`rva_app_v1_3_0.jsx`). ScatterChart matches Excel Graph template format: X = hours 1–24, series = Base Load (grey), Projected (red), Managed Standard (blue), Managed Optimized (green), Managed Uncoordinated (orange, when available), Threshold (dashed). Dark CCE theme. Includes ↓ Save Chart PNG download (2× resolution, white background). Added GRAPH DATA table to Summary CSV: 24-row × 7–8-column table (Hour, Circuit Capacity, Threshold, Base Load, Projected, Managed Standard, Managed Optimized, Managed Uncoordinated) ready to select and chart in Excel. |
+| 2026-04-09 | Removed Standard mode from UI (`rva_app_v1_4_0.jsx`). `handleRun` now runs Optimized and Uncoordinated only. Results grid reduced from 4 columns (Standard, Optimized, Uncoordinated) to 3 (label, Optimized, Uncoordinated). Standard download buttons (Output/History) removed. Chart legend moved from inside-plot overlay to right-side panel (mr increased from 20 to 180) and no longer includes Standard series. `buildSummaryCSV` signature and RESULTS/GRAPH DATA sections updated to omit Standard. User Manual updated throughout to reflect two-model UI. |

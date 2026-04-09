@@ -845,143 +845,152 @@ function Btn({ children, onClick, color, disabled, full }) {
 }
 
 // ── Circuit chart ─────────────────────────────────────────────────────────────
-function drawCircuitChart(canvas, results, params) {
+// ctx, W, H: canvas context and logical dimensions
+// theme: 'dark' (screen) | 'light' (export PNG)
+function drawCircuitChart(ctx, W, H, results, params, theme) {
   const { standard: s, optimized: o, uncoordinated: u } = results;
   const { cap, thresh_pct, base_load, circuit_num } = params;
+  const dark = theme !== 'light';
 
-  const W = canvas.width;   // 660
-  const H = canvas.height;  // 360
+  // Theme colours
+  const T = dark ? {
+    bg:        '#111827',
+    grid:      '#1e2d45',
+    label:     '#7a9cbf',
+    title:     '#e8f4ff',
+    legBg:     'rgba(10,15,26,0.88)',
+    legBorder: '#1e2d45',
+    legText:   '#7a9cbf',
+  } : {
+    bg:        '#ffffff',
+    grid:      '#d0d8e4',
+    label:     '#4a5568',
+    title:     '#1a202c',
+    legBg:     'rgba(255,255,255,0.93)',
+    legBorder: '#b0bbc8',
+    legText:   '#4a5568',
+  };
 
-  const ml = 68, mr = 175, mt = 32, mb = 44;
+  const ml = 68, mr = 20, mt = 32, mb = 44;
   const pw = W - ml - mr;
   const ph = H - mt - mb;
 
-  const ctx = canvas.getContext('2d');
+  // Data
+  const threshold = cap * thresh_pct;
+  const projected = s.projected;
+  const managedS  = projected.map((v, i) => v - s.fleet_power_grid[i]);
+  const managedO  = projected.map((v, i) => v - o.fleet_power_grid[i]);
+  const managedU  = u ? projected.map((v, i) => v - u.fleet_power_grid[i]) : null;
 
-  // Data arrays
-  const threshold   = cap * thresh_pct;
-  const projected   = s.projected;
-  const managedS    = projected.map((v, i) => v - s.fleet_power_grid[i]);
-  const managedO    = projected.map((v, i) => v - o.fleet_power_grid[i]);
-  const managedU    = u ? projected.map((v, i) => v - u.fleet_power_grid[i]) : null;
-
-  // Y scale: 0 to cap * 1.08 rounded up to nearest 1000
   const yMax = Math.ceil(cap * 1.08 / 1000) * 1000;
   const yMin = 0;
-
-  const xAt = i  => ml + (i / 23) * pw;
-  const yAt = v  => mt + ph - Math.max(0, Math.min(1, (v - yMin) / (yMax - yMin))) * ph;
+  const xAt  = i => ml + (i / 23) * pw;
+  const yAt  = v => mt + ph - Math.max(0, Math.min(1, (v - yMin) / (yMax - yMin))) * ph;
 
   // ── Background ────────────────────────────────────────────────────────────
-  ctx.fillStyle = '#111827';
+  ctx.fillStyle = T.bg;
   ctx.fillRect(0, 0, W, H);
 
-  // ── Y grid lines + labels ─────────────────────────────────────────────────
-  const yTickCount = 6;
+  // ── Y grid + labels ───────────────────────────────────────────────────────
   ctx.font = '10px "DM Mono", monospace';
   ctx.textAlign = 'right';
-  for (let t = 0; t <= yTickCount; t++) {
-    const v = yMin + (yMax - yMin) * t / yTickCount;
+  for (let t = 0; t <= 6; t++) {
+    const v = yMin + (yMax - yMin) * t / 6;
     const y = yAt(v);
-    ctx.strokeStyle = '#1e2d45';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([]);
+    ctx.strokeStyle = T.grid; ctx.lineWidth = 1; ctx.setLineDash([]);
     ctx.beginPath(); ctx.moveTo(ml, y); ctx.lineTo(ml + pw, y); ctx.stroke();
-    ctx.fillStyle = '#7a9cbf';
+    ctx.fillStyle = T.label;
     ctx.fillText(Math.round(v).toLocaleString(), ml - 5, y + 4);
   }
 
-  // ── X grid lines + labels ─────────────────────────────────────────────────
-  ctx.font = '10px "DM Mono", monospace';
+  // ── X grid + labels ───────────────────────────────────────────────────────
   ctx.textAlign = 'center';
   for (let h = 0; h < 24; h++) {
     const x = xAt(h);
     if (h % 4 === 0) {
-      ctx.strokeStyle = '#1e2d45';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([]);
+      ctx.strokeStyle = T.grid; ctx.lineWidth = 1; ctx.setLineDash([]);
       ctx.beginPath(); ctx.moveTo(x, mt); ctx.lineTo(x, mt + ph); ctx.stroke();
     }
-    ctx.fillStyle = '#7a9cbf';
+    ctx.fillStyle = T.label;
     ctx.fillText(h + 1, x, mt + ph + 14);
   }
 
   // ── Plot border ───────────────────────────────────────────────────────────
-  ctx.strokeStyle = '#1e2d45';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([]);
+  ctx.strokeStyle = T.grid; ctx.lineWidth = 1; ctx.setLineDash([]);
   ctx.strokeRect(ml, mt, pw, ph);
 
-  // ── Draw series helper ────────────────────────────────────────────────────
-  function drawSeries(data, color, lineWidth, dashed) {
-    ctx.strokeStyle = color;
-    ctx.lineWidth = lineWidth;
-    ctx.setLineDash(dashed ? [5, 4] : []);
-    ctx.lineJoin = 'round';
+  // ── Series helper ─────────────────────────────────────────────────────────
+  function drawSeries(data, color, lw, dashed) {
+    ctx.strokeStyle = color; ctx.lineWidth = lw; ctx.lineJoin = 'round';
+    ctx.setLineDash(dashed ? [6, 4] : []);
     ctx.beginPath();
-    data.forEach((v, i) => {
-      const x = xAt(i), y = yAt(v);
-      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-    });
-    ctx.stroke();
-    ctx.setLineDash([]);
+    data.forEach((v, i) => { const x = xAt(i), y = yAt(v); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); });
+    ctx.stroke(); ctx.setLineDash([]);
   }
 
-  // Draw order: background series first, primary on top
-  const flat = Array(24).fill;
-  drawSeries(Array(24).fill(threshold), '#4a6890', 1.5, true);   // threshold dashed
-  drawSeries(Array(24).fill(cap),       '#2a3a50', 1,   true);   // capacity dashed (very faint)
-  drawSeries(base_load,  '#3a5878', 1.5, false);                  // base load
-  drawSeries(projected,  '#c03030', 2,   false);                  // projected (red)
-  if (managedU) drawSeries(managedU, '#ff8c42', 2, false);        // uncoordinated (orange)
-  drawSeries(managedS,   '#2a7fff', 2,   false);                  // standard (blue)
-  drawSeries(managedO,   '#00c97a', 2.5, false);                  // optimized (green, thickest)
+  // Series (back to front)
+  const capColor  = dark ? '#2a3a50' : '#c0cad8';
+  const thrColor  = dark ? '#4a6890' : '#7090b0';
+  const baseColor = dark ? '#3a5878' : '#8098b4';
+  drawSeries(Array(24).fill(cap),       capColor, 1,   true);
+  drawSeries(Array(24).fill(threshold), thrColor, 1.5, true);
+  drawSeries(base_load,  baseColor, 1.5, false);
+  drawSeries(projected,  '#c03030',  2,   false);
+  if (managedU) drawSeries(managedU, '#e07020', 2,   false);
+  drawSeries(managedS,   '#2a7fff',  2,   false);
+  drawSeries(managedO,   '#00c97a',  2.5, false);
 
   // ── Title ─────────────────────────────────────────────────────────────────
-  ctx.fillStyle = '#e8f4ff';
+  ctx.fillStyle = T.title;
   ctx.font = 'bold 12px "DM Sans", sans-serif';
   ctx.textAlign = 'left';
   ctx.fillText(`Circuit ${circuit_num} — Hourly Load (kW)`, ml, mt - 10);
 
   // ── Axis labels ───────────────────────────────────────────────────────────
-  ctx.fillStyle = '#7a9cbf';
-  ctx.font = '10px "DM Sans", sans-serif';
+  ctx.fillStyle = T.label; ctx.font = '10px "DM Sans", sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText('Hour of Day', ml + pw / 2, H - 6);
-
   ctx.save();
-  ctx.translate(11, mt + ph / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.textAlign = 'center';
-  ctx.fillText('kW', 0, 0);
+  ctx.translate(11, mt + ph / 2); ctx.rotate(-Math.PI / 2);
+  ctx.textAlign = 'center'; ctx.fillText('kW', 0, 0);
   ctx.restore();
 
-  // ── Legend ────────────────────────────────────────────────────────────────
+  // ── Legend (inside plot, lower-right area ~hour 13, ~35% of yMax) ─────────
+  const pctS = (s.penetration * 100).toFixed(1);
+  const pctO = (o.penetration * 100).toFixed(1);
+  const pctU = u ? (u.penetration * 100).toFixed(1) : null;
   const legendItems = [
-    { label: 'Base Load',              color: '#3a5878', dashed: false, lw: 1.5 },
-    { label: 'Projected',              color: '#c03030', dashed: false, lw: 2   },
-    { label: 'Managed — Standard',     color: '#2a7fff', dashed: false, lw: 2   },
-    { label: 'Managed — Optimized',    color: '#00c97a', dashed: false, lw: 2.5 },
-    ...(managedU ? [{ label: 'Managed — Uncoord.', color: '#ff8c42', dashed: false, lw: 2 }] : []),
-    { label: `Threshold (${(thresh_pct * 100).toFixed(0)}%)`, color: '#4a6890', dashed: true, lw: 1.5 },
+    { label: 'Base Load',                              color: baseColor, dashed: false, lw: 1.5 },
+    { label: 'Projected',                              color: '#c03030', dashed: false, lw: 2   },
+    { label: `Managed — Standard (${pctS}%)`,          color: '#2a7fff', dashed: false, lw: 2   },
+    { label: `Managed — Optimized (${pctO}%)`,         color: '#00c97a', dashed: false, lw: 2.5 },
+    ...(pctU ? [{ label: `Managed — Uncoord. (${pctU}%)`, color: '#e07020', dashed: false, lw: 2 }] : []),
+    { label: `Threshold (${(thresh_pct * 100).toFixed(0)}%)`, color: thrColor, dashed: true, lw: 1.5 },
   ];
 
-  const lx = ml + pw + 10;
-  let   ly = mt + 6;
-  ctx.font = '10px "DM Sans", sans-serif';
-  ctx.textAlign = 'left';
+  const ROW = 19, PAD = 8, LINE = 22, GAP = 6;
+  const legW = 202, legH = legendItems.length * ROW + PAD * 2;
+  // Anchor: data-space (hour 13, 35% of yMax) → canvas coords
+  const lx = xAt(12);   // hour 13 (0-indexed = 12)
+  const ly = yAt(yMax * 0.35) - PAD;
 
-  legendItems.forEach(({ label, color, dashed, lw }) => {
-    ctx.strokeStyle = color;
-    ctx.lineWidth = lw;
-    ctx.setLineDash(dashed ? [5, 4] : []);
-    ctx.beginPath();
-    ctx.moveTo(lx, ly + 5); ctx.lineTo(lx + 22, ly + 5);
-    ctx.stroke();
+  ctx.fillStyle = T.legBg;
+  ctx.beginPath();
+  ctx.roundRect ? ctx.roundRect(lx, ly, legW, legH, 4)
+                : ctx.rect(lx, ly, legW, legH);
+  ctx.fill();
+  ctx.strokeStyle = T.legBorder; ctx.lineWidth = 1; ctx.setLineDash([]);
+  ctx.stroke();
+
+  ctx.font = '10px "DM Sans", sans-serif'; ctx.textAlign = 'left';
+  legendItems.forEach(({ label, color, dashed, lw }, idx) => {
+    const iy = ly + PAD + idx * ROW + ROW / 2;
+    ctx.strokeStyle = color; ctx.lineWidth = lw;
+    ctx.setLineDash(dashed ? [5, 3] : []);
+    ctx.beginPath(); ctx.moveTo(lx + PAD, iy); ctx.lineTo(lx + PAD + LINE, iy); ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle = '#7a9cbf';
-    ctx.fillText(label, lx + 28, ly + 9);
-    ly += 20;
+    ctx.fillStyle = T.legText;
+    ctx.fillText(label, lx + PAD + LINE + GAP, iy + 4);
   });
 }
 
@@ -1250,7 +1259,8 @@ function App() {
 
   React.useEffect(() => {
     if (!results || !canvasRef.current) return;
-    drawCircuitChart(canvasRef.current, results, results.params);
+    const c = canvasRef.current;
+    drawCircuitChart(c.getContext('2d'), c.width, c.height, results, results.params, 'dark');
   }, [results]);
 
   // Load circuit CSV → auto-run
@@ -1518,9 +1528,15 @@ function App() {
                 </div>
                 <div style={{ marginBottom: 8 }}>
                   <Btn full color="muted" onClick={() => {
-                    if (!canvasRef.current) return;
+                    if (!results) return;
+                    const SCALE = 2, LW = 660, LH = 360;
+                    const off = document.createElement('canvas');
+                    off.width = LW * SCALE; off.height = LH * SCALE;
+                    const ctx2 = off.getContext('2d');
+                    ctx2.scale(SCALE, SCALE);
+                    drawCircuitChart(ctx2, LW, LH, results, results.params, 'light');
                     const a = document.createElement('a');
-                    a.href = canvasRef.current.toDataURL('image/png');
+                    a.href = off.toDataURL('image/png');
                     a.download = `Circuit_${circuitNum}_chart.png`;
                     a.click();
                   }}>↓ Save Chart PNG</Btn>

@@ -671,6 +671,32 @@ function buildSummaryCSV(state, stdRes, optRes, uncoordRes) {
   rows.push('Hour,Base Load (kW)');
   baseLoad.forEach((v, i) => rows.push(`${i+1},${v}`));
   rows.push('');
+  // Graph data table — ready to select and chart in Excel
+  rows.push('GRAPH DATA');
+  const capVal   = parseFloat(circuitCapacity) || 0;
+  const thrVal   = capVal * (parseFloat(threshold) || 0);
+  const hdr = ['Hour','Circuit Capacity (kW)','Threshold (kW)','Base Load (kW)',
+                'Projected (kW)','Managed Standard (kW)','Managed Optimized (kW)',
+                ...(u ? ['Managed Uncoordinated (kW)'] : [])];
+  rows.push(hdr.join(','));
+  for (let i = 0; i < 24; i++) {
+    const projVal = s.projected[i];
+    const mS = (projVal - s.fleet_power_grid[i]).toFixed(1);
+    const mO = (projVal - o.fleet_power_grid[i]).toFixed(1);
+    const bl = parseFloat(String(baseLoad[i]).replace(/,/g, '')) || 0;
+    const cols = [
+      i + 1,
+      capVal.toFixed(0),
+      thrVal.toFixed(1),
+      bl.toFixed(1),
+      projVal.toFixed(1),
+      mS,
+      mO,
+      ...(u ? [(projVal - u.fleet_power_grid[i]).toFixed(1)] : []),
+    ];
+    rows.push(cols.join(','));
+  }
+  rows.push('');
   // Machine-readable restore section — do not edit manually
   rows.push('RESTORE KEYS');
   rows.push(`circuit,${circuitNum}`);

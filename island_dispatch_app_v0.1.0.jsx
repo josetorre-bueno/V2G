@@ -1,6 +1,6 @@
 // MOD-06 island_dispatch — module
-// Version: v0.4.107
-// Updated: 2026-04-17 15:00 PT
+// Version: v0.4.108
+// Updated: 2026-04-17 16:00 PT
 // Part of: Wipomo / CCE Solar Tools
 
 "use strict";
@@ -2981,11 +2981,9 @@ function App() {
           res._genOptResult = genOptResult;
 
           // Annual trace for winner — powers the full-year dispatch chart.
-          // When batAlreadyPasses=true the battery alone handles the stress window, so the
-          // generator is not needed in any typical year (mathematical guarantee: worst window
-          // is the hardest period; all other days are easier).  In that case we generate the
-          // trace with genKw=0 so the chart is consistent with the selection logic
-          // (annualGenHours=0) rather than showing spurious planning-trigger runs.
+          // Always use the real genKw (never 0) so the chart accurately shows when the
+          // generator fires in a typical year. batAlreadyPasses only means the stress window
+          // is handled by battery alone; unserved load can still occur on other nights.
           const winOpt = genOptResult.optimum;
           if (winOpt && loadHourly) {
             const winMount = mountOptions.find(m => m.label === winOpt.mountLabel);
@@ -2993,10 +2991,8 @@ function App() {
               const winSolar = winMount.solarNormalized.map(x => x * winOpt.pvKw);
               const _wwSA = ((res.spinupStartDoy - 1) + (res._cell.spinup_days || 0)) * 24 % 8760;
               const _wwLA = (res._cell.window_days || 10) * 24;
-              // Use genKw=0 if battery already passes (generator not needed in typical year).
-              const traceGenKw = winOpt.batAlreadyPasses ? 0 : winOpt.genKw;
               const annTr = countAnnualGenHours(
-                winSolar, loadHourly, winOpt.batteryKwh, winOpt.batteryKw, traceGenKw,
+                winSolar, loadHourly, winOpt.batteryKwh, winOpt.batteryKw, winOpt.genKw,
                 fuelCostPerHour, _wwSA, _wwLA, genLookaheadDays, true
               );
               genOptResult.annualTrace = {
@@ -3005,8 +3001,7 @@ function App() {
                 sol: new Float32Array(winSolar),
                 ld:  new Float32Array(loadHourly),
                 batKwh: winOpt.batteryKwh,
-                genKw:  traceGenKw,          // 0 when batAlreadyPasses
-                batAlreadyPasses: winOpt.batAlreadyPasses,
+                genKw:  winOpt.genKw,
               };
             }
           }
@@ -3389,15 +3384,12 @@ function App() {
         ctx.fillRect(x, H - gh, w, gh);
       }
     }
-    // Month dividers + labels
+    // Month dividers (no text labels — rendered as HTML below the canvas)
     const mStart = [0,31,59,90,120,151,181,212,243,273,304,334];
-    const mName  = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-    ctx.font = "9px sans-serif"; ctx.fillStyle = "#444";
-    mStart.forEach((d, i) => {
+    mStart.forEach((d) => {
       const x = (d / 365) * W;
       ctx.strokeStyle = "rgba(0,0,0,0.12)"; ctx.lineWidth = 0.5;
       ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
-      if (x + 2 < W - 10) ctx.fillText(mName[i], x + 2, H - 2);
     });
     // Zoom window highlight + center tick
     const z1 = (annZoomH / N) * W, z2 = ((annZoomH + annZoomW) / N) * W;
@@ -3549,14 +3541,12 @@ function App() {
         ctx.fillRect(x, 0, w, uh);
       }
     }
+    // Month dividers (no text labels — rendered as HTML below the canvas)
     const mStart = [0,31,59,90,120,151,181,212,243,273,304,334];
-    const mName  = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-    ctx.font = "9px sans-serif"; ctx.fillStyle = "#444";
-    mStart.forEach((d, i) => {
+    mStart.forEach((d) => {
       const x = (d / 365) * W;
       ctx.strokeStyle = "rgba(0,0,0,0.12)"; ctx.lineWidth = 0.5;
       ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
-      if (x + 2 < W - 10) ctx.fillText(mName[i], x + 2, H - 2);
     });
     const z1 = (annZoomH / N) * W, z2 = ((annZoomH + annZoomW) / N) * W;
     ctx.fillStyle = "rgba(0,60,200,0.12)";
@@ -4512,7 +4502,7 @@ function App() {
       <div style={S.topBar}>
         <span style={S.orgName}>CCE / Makello</span>
         <span style={S.toolTitle}>Off-Grid Optimizer</span>
-        <span style={S.version}>v0.4.107</span>
+        <span style={S.version}>v0.4.108</span>
         <span style={S.version}>MOD-06</span>
         <span style={{...S.tagline, marginLeft:"auto"}}>
           <a href="https://tools.cc-energy.org/index.html"
@@ -5396,25 +5386,6 @@ function App() {
                         <div style={{ fontSize: "12px", fontWeight: 700, color: "#333", marginBottom: "6px" }}>
                           📅 Annual Dispatch — Comparison
                         </div>
-
-                        {/* Shared slider controls */}
-                        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
-                          <button
-                            style={{ padding: "3px 12px", fontSize: "14px", cursor: "pointer",
-                                     border: "1px solid #aaa", borderRadius: "4px", background: "#f5f5f5", lineHeight: 1.2 }}
-                            onClick={() => scrollAnn(-1)}>←</button>
-                          <input
-                            type="range" min={0} max={sliderMax} value={Math.min(annZoomH, sliderMax)}
-                            onChange={e => setAnnZoomH(Number(e.target.value))}
-                            style={{ flex: 1 }}
-                          />
-                          <button
-                            style={{ padding: "3px 12px", fontSize: "14px", cursor: "pointer",
-                                     border: "1px solid #aaa", borderRadius: "4px", background: "#f5f5f5", lineHeight: 1.2 }}
-                            onClick={() => scrollAnn(1)}>→</button>
-                          <span style={{ fontSize: "10px", color: "#888", whiteSpace: "nowrap",
-                                         minWidth: "60px", textAlign: "right" }}>{zoomLabel}</span>
-                        </div>
                         <div style={{ fontSize: "10px", color: "#666", marginBottom: "4px" }}>
                           Scroll wheel on any chart to zoom · click any overview to navigate · dashed line = values shown below
                         </div>
@@ -5466,6 +5437,25 @@ function App() {
                             )}
                           </div>
                         </div>
+
+                        {/* Shared slider controls — below values panel, close to the charts */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "8px" }}>
+                          <button
+                            style={{ padding: "3px 12px", fontSize: "14px", cursor: "pointer",
+                                     border: "1px solid #aaa", borderRadius: "4px", background: "#f5f5f5", lineHeight: 1.2 }}
+                            onClick={() => scrollAnn(-1)}>←</button>
+                          <input
+                            type="range" min={0} max={sliderMax} value={Math.min(annZoomH, sliderMax)}
+                            onChange={e => setAnnZoomH(Number(e.target.value))}
+                            style={{ flex: 1 }}
+                          />
+                          <button
+                            style={{ padding: "3px 12px", fontSize: "14px", cursor: "pointer",
+                                     border: "1px solid #aaa", borderRadius: "4px", background: "#f5f5f5", lineHeight: 1.2 }}
+                            onClick={() => scrollAnn(1)}>→</button>
+                          <span style={{ fontSize: "10px", color: "#888", whiteSpace: "nowrap",
+                                         minWidth: "60px", textAlign: "right" }}>{zoomLabel}</span>
+                        </div>
                       </div>
 
                       {/* Battery-only chart card */}
@@ -5491,6 +5481,12 @@ function App() {
                           <canvas ref={annBatOverviewRef}
                             style={{ width: "100%", height: "72px", display: "block", cursor: "pointer", border: "1px solid #ddd", borderRadius: "3px" }}
                             onClick={handleBatOverviewClick} />
+                          <div style={{ position: "relative", height: "14px", marginBottom: "2px" }}>
+                            {[["Jan",0],["Feb",31],["Mar",59],["Apr",90],["May",120],["Jun",151],
+                              ["Jul",181],["Aug",212],["Sep",243],["Oct",273],["Nov",304],["Dec",334]].map(([m,d]) => (
+                              <span key={m} style={{ position: "absolute", left: `${(d/365)*100}%`, fontSize: "9px", color: "#666", transform: "translateX(2px)" }}>{m}</span>
+                            ))}
+                          </div>
                           <div ref={annBatDetailContRef} style={{ touchAction: "none", marginTop: "4px" }}>
                             <div style={{ height: "160px" }}>
                               <canvas ref={annBatP1Ref} style={{ width: "100%", height: "100%" }} />
@@ -5507,18 +5503,20 @@ function App() {
                         <div style={S.card}>
                           <div style={{ fontSize: "12px", fontWeight: 700, color: "#1a4a7a", marginBottom: "6px" }}>
                             📅 Generator Annual — {genOpt.pvKw} kW {genOpt.mountLabel} · {genOpt.batteryLabel} · {genOpt.genKw} kW gen
-                            {annGenTrace.batAlreadyPasses && <span style={{ color: "#155724", fontWeight: 400, marginLeft: "8px", fontSize: "11px" }}>(battery covers all load — generator not needed in typical year)</span>}
                           </div>
                           <div style={{ fontSize: "10px", color: "#666", marginBottom: "3px" }}>
                             <span style={{ color: "#1a60c0" }}>■</span> battery SOC avg/day &nbsp;
-                            {annGenTrace.batAlreadyPasses
-                              ? <span style={{ color: "#155724" }}>Battery alone handles all load in typical year</span>
-                              : <><span style={{ color: "rgba(210,80,10,0.9)" }}>■</span> generator hrs/day</>
-                            }. Click to navigate.
+                            <span style={{ color: "rgba(210,80,10,0.9)" }}>■</span> generator hrs/day. Click to navigate.
                           </div>
                           <canvas ref={annOverviewRef}
                             style={{ width: "100%", height: "72px", display: "block", cursor: "pointer", border: "1px solid #ddd", borderRadius: "3px" }}
                             onClick={handleGenOverviewClick} />
+                          <div style={{ position: "relative", height: "14px", marginBottom: "2px" }}>
+                            {[["Jan",0],["Feb",31],["Mar",59],["Apr",90],["May",120],["Jun",151],
+                              ["Jul",181],["Aug",212],["Sep",243],["Oct",273],["Nov",304],["Dec",334]].map(([m,d]) => (
+                              <span key={m} style={{ position: "absolute", left: `${(d/365)*100}%`, fontSize: "9px", color: "#666", transform: "translateX(2px)" }}>{m}</span>
+                            ))}
+                          </div>
                           <div ref={annDetailContRef} style={{ touchAction: "none", marginTop: "4px" }}>
                             <div style={{ height: "160px" }}>
                               <canvas ref={annP1Ref} style={{ width: "100%", height: "100%" }} />

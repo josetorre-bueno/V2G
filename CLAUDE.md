@@ -80,22 +80,27 @@ The old multi-column spreadsheet-derived format is retired. Semi-permanent param
 
 ## Versioning
 
-Every change to the UI — no matter how small — must increment **at least the minor version number** (`v1.X.0`) in **all** of the following locations simultaneously:
+Follow the global config versioning rules. V2G-specific notes:
+
+- **Every change bumps the patch** (rightmost number): `v1.7.0 → v1.7.1`
+- **Minor bumps on reorganisation** (middle number): `v1.7.x → v1.8.0`
+- **Major requires Jose's approval**
+- **Never edit a deployed JSX file** — always create a new versioned file
+
+Version number must appear identically in all of the following locations:
 
 | Location | Example |
 |---|---|
-| JSX filename | `rva_app_v1_4_0.jsx` |
-| `const VERSION` inside the JSX | `const VERSION = "1.4.0";` |
-| Top comment in the JSX | `// Version: 1.4.0` |
-| `index.html` `<title>` | `V2G Analysis Engine v1.4.0 — CCE` |
-| `index.html` version comment | `<!-- Version: v1.4.0 -->` |
-| `index.html` module file comment | `<!-- Module file: rva_app_v1_4_0.jsx -->` |
-| `index.html` `<script src>` | `rva_app_v1_4_0.jsx?v=1.4.0` |
+| JSX filename | `rva_app_v1_7_1.jsx` (underscores, not dots) |
+| `const VERSION` inside the JSX | `const VERSION = "1.7.1";` |
+| Top comment in the JSX | `// Version: 1.7.1` |
+| `index.html` `<title>` | `V2G Analysis Engine v1.7.1 — CCE` |
+| `index.html` version comment | `<!-- Version: v1.7.1 -->` |
+| `index.html` module file comment | `<!-- Module file: rva_app_v1_7_1.jsx -->` |
+| `index.html` `<script src>` | `rva_app_v1_7_1.jsx?v=1.7.1` |
 | CLAUDE.md change log | new row with date and description |
 
-**Never edit an existing versioned JSX file after it has been deployed.** Create a new file with the incremented version number instead. This ensures that the filename, the displayed version, and the loaded script are always in sync, and that the browser cache-busting query string (`?v=X.X.X`) forces a reload.
-
-Use **patch version** (`v1.3.X`) only for hotfixes to a version that has not yet been deployed. Once a version is live on GitHub Pages, always increment the minor version.
+**Note:** V2G filenames use underscores as separators (`rva_app_v1_7_1.jsx`) rather than dots. This is a project convention — dots in filenames cause issues with some server configurations.
 
 ---
 
